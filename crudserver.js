@@ -4,7 +4,7 @@ const propertiesReader = require('properties-reader');
 
 const app = express();
 
-const PORT = 3000;
+const PORT = properties.get("port");
 
 const properties = propertiesReader('database.properties');
 
