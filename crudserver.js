@@ -4,9 +4,9 @@ const propertiesReader = require('properties-reader');
 
 const app = express();
 
-const PORT = properties.get("port");
-
 const properties = propertiesReader('database.properties');
+
+const PORT = properties.get("port");
 
 const connection = mysql.createConnection({
     host: properties.get("host"),
@@ -15,25 +15,26 @@ const connection = mysql.createConnection({
     database: properties.get("database")
 })
 
-connection.connect(error => {
-    if(error){
-        console.log("oh no!!");
-        throw error;
-    }
-
-    app.listen(PORT, () => {
-        console.log("connected to server on port:", PORT);
-    })
+app.listen(PORT, () => {
+    console.log("starting the crud server");
 })
 
-connection.query('SELECT * FROM users', (err, res, fields) => {
-    console.log(res[0]);
-});
+app.get('/users', (req, res) => {
+    connection.connect(error => {
+        if(error){
+            console.log("oh no!!");
+            throw error;
+        }
+    })
+    connection.query('SELECT * FROM users', (err, qRes, fields) => {
+        console.log(qRes[0]);
+        if(err){
+            console.log("select user query failed");
+        }
 
-// app.listen(3000, () => {
-//     console.log("starting the crud server");
-// })
+        res.send(qRes);
 
-// app.get('/', (req, res) => {
-//     res.send("hello this is the crud server");
-// })
+    });
+
+    //res.send("hello from users");
+})
