@@ -1,5 +1,6 @@
 const express = require('express');
-const mysql = require('mysql2');
+const res = require('express/lib/response');
+const mysql = require('mysql2/promise');
 const propertiesReader = require('properties-reader');
 
 const app = express();
@@ -8,33 +9,37 @@ const properties = propertiesReader('database.properties');
 
 const PORT = properties.get("port");
 
-const connection = mysql.createConnection({
+const connProps = {
     host: properties.get("host"),
     user: properties.get("user"),
     password: properties.get("password"),
     database: properties.get("database")
-})
+};
 
 app.listen(PORT, () => {
     console.log("starting the crud server");
 })
 
-app.get('/users', (req, res) => {
-    connection.connect(error => {
-        if(error){
-            console.log("oh no!!");
-            throw error;
-        }
-    })
-    connection.query('SELECT * FROM users', (err, qRes, fields) => {
-        console.log(qRes[0]);
-        if(err){
-            console.log("select user query failed");
-        }
+app.get('/users', async function(req, res) {
 
-        res.send(qRes);
+    const result = await sqlQuery('SELECT * FROM users');
+    res.send(result);
 
-    });
-
-    //res.send("hello from users");
 })
+
+app.get('/users/:userId', async function(req, res) {
+    console.log(req.params.userId);
+    const result = await sqlQuery('SELECT * FROM users WHERE userId = ?', [req.params.userId]);
+    res.send(result);
+
+})
+
+
+
+async function sqlQuery(cmd, params){
+    console.log(params);
+    const dbConnection = await mysql.createConnection(connProps);
+    const [rows] = await dbConnection.execute(cmd, params);
+    
+    return rows;
+}
