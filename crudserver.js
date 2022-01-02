@@ -3,6 +3,9 @@ const res = require('express/lib/response');
 const mysql = require('mysql2/promise');
 const propertiesReader = require('properties-reader');
 const bodyParser = require('body-parser');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { send } = require('express/lib/response');
 
 const app = express();
 
@@ -28,7 +31,67 @@ app.listen(PORT, () => {
     console.log("starting the crud server");
 })
 
-app.get('/users', async function(req, res) {
+function generateAccessToken(username){
+    return jwt.sign({ username: username }, properties.get("TOKEN_SECRET"), { expiresIn: 1800 });
+}
+
+function authenticateToken(req, res, next){
+    const token = req.headers['x-access-token'];
+    if(!token){
+        return res.status(401).send("no token");
+    }
+
+    try{
+        const decoded = jwt.verify(token, properties.get("TOKEN_SECRET"));
+        req.user = decoded;
+    }
+    catch(err){
+        return res.status(401).send("invalid token");
+    }
+    
+    return next();
+}
+
+app.post('/register', async function(req, res) {
+
+    var hashPass = await bcrypt.hash(req.body.password, 10);
+
+    try{
+        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)', 
+        [req.body.username, hashPass, req.body.email, req.body.role]);
+
+        const token = generateAccessToken(req.body.username);
+        res.send(token);
+    }
+    catch(error){
+        console.log(error);
+        res.status(400).send("failed to create new user");
+    }
+})
+
+app.post('/login', async function(req, res){
+    try{
+        const result = await sqlQuery('SELECT * FROM users WHERE username = ?', [req.body.username]);
+        if(!result[0]){
+            return res.status(400).send("user does not exist");
+        }
+
+        var validPass = await bcrypt.compare(req.body.password, result[0].password);
+        if(validPass){
+            token = generateAccessToken(result[0].username);
+            res.send(token);
+        }
+        else{
+            return res.send("invalid password");
+        }
+    }
+    catch(error){
+        console.log(error);
+        res.send("failed to login");
+    }
+})
+
+app.get('/users', authenticateToken, async function(req, res) {
     try{
         const result = await sqlQuery('SELECT * FROM users');
         res.send(result);
@@ -39,18 +102,18 @@ app.get('/users', async function(req, res) {
     }
 })
 
-app.get('/users/:userId', async function(req, res) {
+app.get('/users/:userId', authenticateToken, async function(req, res) {
     try{
         const result = await sqlQuery('SELECT * FROM users WHERE userId = ?', [req.params.userId]);
         res.send(result);
     }
     catch(error){
         console.log(error);
-        res.send("failed to find user with id ${req.params.userId}");
+        res.send(`failed to find user with id ${req.params.userId}`);
     }
 })
 
-app.post('/users', async function(req, res) {
+app.post('/users', authenticateToken, async function(req, res) {
     try{
         const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)', 
         [req.body.username, req.body.password, req.body.email, req.body.role]);
@@ -62,7 +125,7 @@ app.post('/users', async function(req, res) {
     }
 })
 
-app.put('/users/:userId', async function(req, res) {
+app.put('/users/:userId', authenticateToken, async function(req, res) {
     try{
         const result = await sqlQuery('UPDATE users SET username = ?, password = ?, email = ?, role = ? WHERE userid = ?;', 
         [req.body.username, req.body.password, req.body.email, req.body.role, req.params.userId]);
@@ -74,7 +137,7 @@ app.put('/users/:userId', async function(req, res) {
     }
 })
 
-app.delete('/users/:userId', async function(req, res) {
+app.delete('/users/:userId', authenticateToken, async function(req, res) {
     try{
         const result = await sqlQuery('DELETE FROM users WHERE userId = ?', [req.params.userId]);
         res.send(result);
