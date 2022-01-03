@@ -79,8 +79,8 @@ app.post('/register', async function(req, res) {
     var hashPass = await bcrypt.hash(req.body.password, 10);
 
     try{
-        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)', 
-        [req.body.username, hashPass, req.body.email, req.body.role]);
+        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
+        [req.body.username, hashPass, req.body.email]);
 
         const token = generateAccessToken(req.body.username);
         const rtoken = generateRefreshToken(req.body.username);
@@ -117,7 +117,7 @@ app.post('/login', async function(req, res){
 
 app.get('/users', authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('SELECT * FROM users');
+        const result = await sqlQuery('SELECT username, email, role FROM users');
         res.send(result);
     }
     catch(error){
@@ -126,21 +126,24 @@ app.get('/users', authenticateToken, async function(req, res) {
     }
 })
 
-app.get('/users/:userId', authenticateToken, async function(req, res) {
+app.get('/users/:username', authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('SELECT * FROM users WHERE userId = ?', [req.params.userId]);
+        const result = await sqlQuery('SELECT username, email, role FROM users WHERE username = ?', [req.params.username]);
         res.send(result);
     }
     catch(error){
         console.log(error);
-        res.send(`failed to find user with id ${req.params.userId}`);
+        res.send(`failed to find user ${req.params.username}`);
     }
 })
 
 app.post('/users', authenticateToken, async function(req, res) {
+
+    var hashPass = await bcrypt.hash(req.body.password, 10);
+
     try{
-        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, ?)', 
-        [req.body.username, req.body.password, req.body.email, req.body.role]);
+        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
+        [req.body.username, hashPass, req.body.email]);
         res.send(result);
     }
     catch(error){
@@ -149,26 +152,29 @@ app.post('/users', authenticateToken, async function(req, res) {
     }
 })
 
-app.put('/users/:userId', authenticateToken, async function(req, res) {
+app.put('/users/:username', authenticateToken, async function(req, res) {
+
+    var hashPass = await bcrypt.hash(req.body.password, 10);
+
     try{
-        const result = await sqlQuery('UPDATE users SET username = ?, password = ?, email = ?, role = ? WHERE userid = ?;', 
-        [req.body.username, req.body.password, req.body.email, req.body.role, req.params.userId]);
+        const result = await sqlQuery('UPDATE users SET username = ?, password = ?, email = ? WHERE username = ?;', 
+        [req.body.username, hashPass, req.body.email, req.params.username]);
         res.send(result);
     }
     catch(error){
         console.log(error);
-        res.send("failed to update user with id ${req.params.userId}");
+        res.send(`failed to update user ${req.params.username}`);
     }
 })
 
-app.delete('/users/:userId', authenticateToken, async function(req, res) {
+app.delete('/users/:username', authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('DELETE FROM users WHERE userId = ?', [req.params.userId]);
+        const result = await sqlQuery('DELETE FROM users WHERE username = ?', [req.params.username]);
         res.send(result);
     }
     catch(error){
         console.log(error);
-        res.send("failed to delete user with id ${req.params.userId}");
+        res.send(`failed to delete user ${req.params.username}`);
     }
 })
 
