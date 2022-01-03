@@ -6,19 +6,13 @@ const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { send } = require('express/lib/response');
+const services = require('./services');
 
 const app = express();
 
 const properties = propertiesReader('database.properties');
 
 const PORT = properties.get("port");
-
-const connProps = {
-    host: properties.get("host"),
-    user: properties.get("user"),
-    password: properties.get("password"),
-    database: properties.get("database")
-};
 
 app.use(bodyParser.json());
 app.use(
@@ -31,32 +25,6 @@ app.listen(PORT, () => {
     console.log("starting the crud server");
 })
 
-function generateAccessToken(username){
-    return jwt.sign({ username: username }, properties.get("access_secret"), { expiresIn: properties.get("access_timeout") });
-}
-
-function generateRefreshToken(username){
-    return jwt.sign({ username: username }, properties.get("refresh_secret"), { expiresIn: properties.get("refresh_timeout") });
-}
-
-function authenticateToken(req, res, next){
-    const token = req.headers['x-access-token'];
-    if(!token){
-        return res.status(401).send("no token");
-    }
-
-    try{
-        const decoded = jwt.verify(token, properties.get("access_secret"));
-        req.user = decoded;
-    }
-    catch(err){
-        console.log(err);
-        return res.status(401).send("invalid token");
-    }
-    
-    return next();
-}
-
 app.get('/refreshtoken', async function(req, res){
     const rtoken = req.headers['x-access-token'];
     if(!rtoken){
@@ -65,7 +33,7 @@ app.get('/refreshtoken', async function(req, res){
     try{
         const decoded = jwt.verify(rtoken, properties.get("refresh_secret"));
         const username = decoded.username;
-        const token = generateAccessToken(username);
+        const token = services.generateAccessToken(username);
         res.send(token);
     }
     catch(err){
@@ -79,11 +47,11 @@ app.post('/register', async function(req, res) {
     var hashPass = await bcrypt.hash(req.body.password, 10);
 
     try{
-        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
+        const result = await services.sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
         [req.body.username, hashPass, req.body.email]);
 
-        const token = generateAccessToken(req.body.username);
-        const rtoken = generateRefreshToken(req.body.username);
+        const token = services.generateAccessToken(req.body.username);
+        const rtoken = services.generateRefreshToken(req.body.username);
         res.send({ token: token, rtoken : rtoken });
     }
     catch(error){
@@ -94,15 +62,15 @@ app.post('/register', async function(req, res) {
 
 app.post('/login', async function(req, res){
     try{
-        const result = await sqlQuery('SELECT * FROM users WHERE username = ?', [req.body.username]);
+        const result = await services.sqlQuery('SELECT * FROM users WHERE username = ?', [req.body.username]);
         if(!result[0]){
             return res.status(400).send("user does not exist");
         }
 
         var validPass = await bcrypt.compare(req.body.password, result[0].password);
         if(validPass){
-            const token = generateAccessToken(result[0].username);
-            const rtoken = generateRefreshToken(result[0].username);
+            const token = services.generateAccessToken(result[0].username);
+            const rtoken = services.generateRefreshToken(result[0].username);
             res.send({ token: token, rtoken : rtoken });
         }
         else{
@@ -115,9 +83,9 @@ app.post('/login', async function(req, res){
     }
 })
 
-app.get('/users', authenticateToken, async function(req, res) {
+app.get('/users', services.authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('SELECT username, email, role FROM users');
+        const result = await services.sqlQuery('SELECT username, email, role FROM users');
         res.send(result);
     }
     catch(error){
@@ -126,9 +94,9 @@ app.get('/users', authenticateToken, async function(req, res) {
     }
 })
 
-app.get('/users/:username', authenticateToken, async function(req, res) {
+app.get('/users/:username', services.authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('SELECT username, email, role FROM users WHERE username = ?', [req.params.username]);
+        const result = await services.sqlQuery('SELECT username, email, role FROM users WHERE username = ?', [req.params.username]);
         res.send(result);
     }
     catch(error){
@@ -137,12 +105,12 @@ app.get('/users/:username', authenticateToken, async function(req, res) {
     }
 })
 
-app.post('/users', authenticateToken, async function(req, res) {
+app.post('/users', services.authenticateToken, async function(req, res) {
 
     var hashPass = await bcrypt.hash(req.body.password, 10);
 
     try{
-        const result = await sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
+        const result = await services.sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
         [req.body.username, hashPass, req.body.email]);
         res.send(result);
     }
@@ -152,12 +120,12 @@ app.post('/users', authenticateToken, async function(req, res) {
     }
 })
 
-app.put('/users/:username', authenticateToken, async function(req, res) {
+app.put('/users/:username', services.authenticateToken, async function(req, res) {
 
     var hashPass = await bcrypt.hash(req.body.password, 10);
 
     try{
-        const result = await sqlQuery('UPDATE users SET username = ?, password = ?, email = ? WHERE username = ?;', 
+        const result = await services.sqlQuery('UPDATE users SET username = ?, password = ?, email = ? WHERE username = ?;', 
         [req.body.username, hashPass, req.body.email, req.params.username]);
         res.send(result);
     }
@@ -167,9 +135,9 @@ app.put('/users/:username', authenticateToken, async function(req, res) {
     }
 })
 
-app.delete('/users/:username', authenticateToken, async function(req, res) {
+app.delete('/users/:username', services.authenticateToken, async function(req, res) {
     try{
-        const result = await sqlQuery('DELETE FROM users WHERE username = ?', [req.params.username]);
+        const result = await services.sqlQuery('DELETE FROM users WHERE username = ?', [req.params.username]);
         res.send(result);
     }
     catch(error){
@@ -178,10 +146,3 @@ app.delete('/users/:username', authenticateToken, async function(req, res) {
     }
 })
 
-async function sqlQuery(cmd, params){
-    //console.log(params);
-    const dbConnection = await mysql.createConnection(connProps);
-    const [rows] = await dbConnection.execute(cmd, params);
-    
-    return rows;
-}
