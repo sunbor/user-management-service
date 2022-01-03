@@ -32,7 +32,11 @@ app.listen(PORT, () => {
 })
 
 function generateAccessToken(username){
-    return jwt.sign({ username: username }, properties.get("TOKEN_SECRET"), { expiresIn: 1800 });
+    return jwt.sign({ username: username }, properties.get("access_secret"), { expiresIn: properties.get("access_timeout") });
+}
+
+function generateRefreshToken(username){
+    return jwt.sign({ username: username }, properties.get("refresh_secret"), { expiresIn: properties.get("refresh_timeout") });
 }
 
 function authenticateToken(req, res, next){
@@ -42,15 +46,33 @@ function authenticateToken(req, res, next){
     }
 
     try{
-        const decoded = jwt.verify(token, properties.get("TOKEN_SECRET"));
+        const decoded = jwt.verify(token, properties.get("access_secret"));
         req.user = decoded;
     }
     catch(err){
+        console.log(err);
         return res.status(401).send("invalid token");
     }
     
     return next();
 }
+
+app.get('/refreshtoken', async function(req, res){
+    const rtoken = req.headers['x-access-token'];
+    if(!rtoken){
+        return res.status(401).send("no refresh token");
+    }
+    try{
+        const decoded = jwt.verify(rtoken, properties.get("refresh_secret"));
+        const username = decoded.username;
+        const token = generateAccessToken(username);
+        res.send(token);
+    }
+    catch(err){
+        console.log(err);
+        return res.status(401).send("invalid token");
+    }
+})
 
 app.post('/register', async function(req, res) {
 
@@ -61,7 +83,8 @@ app.post('/register', async function(req, res) {
         [req.body.username, hashPass, req.body.email, req.body.role]);
 
         const token = generateAccessToken(req.body.username);
-        res.send(token);
+        const rtoken = generateRefreshToken(req.body.username);
+        res.send({ token: token, rtoken : rtoken });
     }
     catch(error){
         console.log(error);
@@ -78,8 +101,9 @@ app.post('/login', async function(req, res){
 
         var validPass = await bcrypt.compare(req.body.password, result[0].password);
         if(validPass){
-            token = generateAccessToken(result[0].username);
-            res.send(token);
+            const token = generateAccessToken(result[0].username);
+            const rtoken = generateRefreshToken(result[0].username);
+            res.send({ token: token, rtoken : rtoken });
         }
         else{
             return res.send("invalid password");
