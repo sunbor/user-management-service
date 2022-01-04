@@ -9,4 +9,4 @@ Rename database2.properties to database.properties. Enter in the access secret a
 
 Run "node crudserver.js" to start the server.
 
-See https://documenter.getpostman.com/view/10110930/UVXbsymn for information on endpoints
+See https://documenter.getpostman.com/view/10110930/UVXbsymn for information on endpoints.
