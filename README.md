@@ -1,4 +1,4 @@
-# nodecrud
+# User management service
 This service allows management and authentication of users. It allows registration of new users, logging in existing users, and CRUD operations on users. Authentication is done through JWT, which is provided on registration and login. The CRUD operations require JWT authentication to perform.
 
 Use npm install to install dependencies.
