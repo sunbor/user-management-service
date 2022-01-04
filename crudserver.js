@@ -25,23 +25,6 @@ app.listen(PORT, () => {
     console.log("starting the crud server");
 })
 
-app.get('/refreshtoken', async function(req, res){
-    const rtoken = req.headers['x-access-token'];
-    if(!rtoken){
-        return res.status(401).send("no refresh token");
-    }
-    try{
-        const decoded = jwt.verify(rtoken, properties.get("refresh_secret"));
-        const username = decoded.username;
-        const token = services.generateAccessToken(username);
-        res.send(token);
-    }
-    catch(err){
-        console.log(err);
-        return res.status(401).send("invalid token");
-    }
-})
-
 app.post('/register', async function(req, res) {
 
     var hashPass = await bcrypt.hash(req.body.password, 10);
@@ -112,7 +95,7 @@ app.post('/users', services.authenticateToken, async function(req, res) {
     try{
         const result = await services.sqlQuery('INSERT INTO users (username, password, email, role) VALUES (?, ?, ?, 2)', 
         [req.body.username, hashPass, req.body.email]);
-        res.send(result);
+        res.send(`successfully added user ${req.body.username}`);
     }
     catch(error){
         console.log(error);
@@ -127,7 +110,7 @@ app.put('/users/:username', services.authenticateToken, async function(req, res)
     try{
         const result = await services.sqlQuery('UPDATE users SET username = ?, password = ?, email = ? WHERE username = ?;', 
         [req.body.username, hashPass, req.body.email, req.params.username]);
-        res.send(result);
+        res.send(`successfully updated user ${req.body.username}`);
     }
     catch(error){
         console.log(error);
@@ -138,7 +121,7 @@ app.put('/users/:username', services.authenticateToken, async function(req, res)
 app.delete('/users/:username', services.authenticateToken, async function(req, res) {
     try{
         const result = await services.sqlQuery('DELETE FROM users WHERE username = ?', [req.params.username]);
-        res.send(result);
+        res.send(`successfully deleted user ${req.params.username}`);
     }
     catch(error){
         console.log(error);
@@ -146,3 +129,19 @@ app.delete('/users/:username', services.authenticateToken, async function(req, r
     }
 })
 
+app.get('/refreshtoken', async function(req, res){
+    const rtoken = req.headers['x-access-token'];
+    if(!rtoken){
+        return res.status(401).send("no refresh token");
+    }
+    try{
+        const decoded = jwt.verify(rtoken, properties.get("refresh_secret"));
+        const username = decoded.username;
+        const token = services.generateAccessToken(username);
+        res.send(token);
+    }
+    catch(err){
+        console.log(err);
+        return res.status(401).send("invalid token");
+    }
+})

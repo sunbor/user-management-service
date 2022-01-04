@@ -24,6 +24,7 @@ function generateRefreshToken(username){
     return jwt.sign({ username: username }, properties.get("refresh_secret"), { expiresIn: properties.get("refresh_timeout") });
 }
 
+//middleware
 function authenticateToken(req, res, next){
     const token = req.headers['x-access-token'];
     if(!token){
